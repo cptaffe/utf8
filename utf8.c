@@ -1,4 +1,6 @@
 
+// Copyright (c) 2015 Connor Taffe
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
