@@ -14,6 +14,7 @@ const utf8_String UTF8_BOM = {
 	.len = sizeof(_bom)
 };
 
+// get Rune from file.
 utf8_Rune utf8_GetRune(FILE *file) {
 	if (!file) {
 		return 0; // error
@@ -34,6 +35,8 @@ utf8_Rune utf8_GetRune(FILE *file) {
 		}
 		((uint8_t *) &c)[i] = j;
 	}
+
+	// check for validity.
 	if (utf8_isValidRune(c)) {
 		return c;
 	} else {
@@ -287,7 +290,7 @@ bool utf8_isValidRune(const utf8_Rune rune) {
 }
 
 // negative values are errors
-int utf8_StringRuneCount(const utf8_String *str) {
+int utf8_RuneCountInString(const utf8_String *str) {
 	// assertions
 	if (!str || !str->str) {
 		return -1; // error

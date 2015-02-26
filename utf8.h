@@ -57,9 +57,9 @@ utf8_String *utf8_String_init(const uint8_t *str);
 // accepts a String to free and returns nothing.
 void utf8_String_free(utf8_String *str);
 
-// StringRuneCount
+// RuneCountInString
 // returns the number of Runes in a String.
-int utf8_StringRuneCount(const utf8_String *str);
+int utf8_RuneCountInString(const utf8_String *str);
 
 // StringRuneLen
 // accepts a String and returns the length of
