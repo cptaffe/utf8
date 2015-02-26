@@ -3,7 +3,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <assert.h>
 
 #include "utf8.h"
@@ -14,6 +13,33 @@ const utf8_String UTF8_BOM = {
 	.str = (uint8_t *) _bom,
 	.len = sizeof(_bom)
 };
+
+utf8_Rune utf8_GetRune(FILE *file) {
+	if (!file) {
+		return 0; // error
+	}
+
+	utf8_Rune c = getc(file);
+	if (c == EOF) {
+		return 0;
+	}
+	int len = utf8_RuneLen(c);
+	if (len < 0) {
+		return 0;
+	}
+	for (int i = 1; i < len; i++) {
+		char j = getc(file);
+		if (j == EOF) {
+			return 0;
+		}
+		((uint8_t *) &c)[i] = j;
+	}
+	if (utf8_isValidRune(c)) {
+		return c;
+	} else {
+		return 0;
+	}
+}
 
 // returns null on failure
 utf8_Parser *utf8_Parser_init(const utf8_String *str) {
@@ -58,7 +84,7 @@ void utf8_String_free(utf8_String *str) {
 }
 
 // compare two strings (not length dependent)
-int utf8_String_cmp(const utf8_String *a, const utf8_String *b) {
+int utf8_StringCmp(const utf8_String *a, const utf8_String *b) {
 	// assertions
 	assert(a && b);
 
@@ -113,10 +139,10 @@ int utf8_RuneLen(const utf8_Rune r) {
 }
 
 // checks for bom, if found, increments over it.
-bool utf8_BomCheck(const utf8_String *str) {
+bool utf8_StringBomCheck(const utf8_String *str) {
 	// length safety
 	if (str->len >= sizeof(UTF8_BOM)) {
-		if (utf8_String_cmp(str, &UTF8_BOM)) {
+		if (utf8_StringCmp(str, &UTF8_BOM)) {
 			return true;
 		}
 	}
@@ -138,7 +164,7 @@ char *_print_binary(int32_t bin, size_t len) {
 }
 
 // returns codepoint value of utf-8 character
-uint32_t utf8_RuneDecode(const utf8_Rune rune) {
+int utf8_RuneDecode(const utf8_Rune rune, uint32_t *cp) {
 	// get number of bits.
 	int bl = utf8_RuneLen(rune);
 	assert(bl >= 0 && bl <= 8);
@@ -150,11 +176,11 @@ uint32_t utf8_RuneDecode(const utf8_Rune rune) {
 		mask += (1 << i);
 	}
 
-	uint32_t cp = rune & mask;
+	*cp = rune & mask;
 	// byte order is backwards on this machine (endianness).
 	// shift first bits by the the number of bits in each
 	// subsequent byte (6) once for every remaining byte (bl)
-	cp <<= (bl - 1) * 6;
+	*cp <<= (bl - 1) * 6;
 	mask = 0x3f;
 	for (int i = 1; i < bl; i++) {
 		// for each byte after the 1st, do:
@@ -166,10 +192,10 @@ uint32_t utf8_RuneDecode(const utf8_Rune rune) {
 		// give the shift needed to place lower bytes near
 		// the first byte and provide the inverse ordering needed
 		// to get a correct number.
-		cp |= (c << (((bl - i) - 1) * 6));
+		*cp |= (c << (((bl - i) - 1) * 6));
 	}
 
-	return cp;
+	return 0;
 }
 
 // returns encoded rune from codepoint
@@ -192,7 +218,6 @@ int utf8_RuneEncode(const uint32_t cp, utf8_Rune *rune) {
 
 	if (bl == 1) {
 		*rune = (utf8_Rune) cp; // no special transform
-		return 0; // success
 	} else {
 		uint32_t mask = 0;
 		uint32_t code = 0;
@@ -250,19 +275,19 @@ int utf8_RuneEncode(const uint32_t cp, utf8_Rune *rune) {
 			code |= c;
 		}
 		*rune = code;
-		return 0;
 	}
+	return bl;
 }
 
 
 // checks byte for validity.
-bool utf8_ValidRune(const utf8_Rune rune) {
+bool utf8_isValidRune(const utf8_Rune rune) {
 	// TODO: implement validation tests.
 	return true;
 }
 
 // negative values are errors
-int utf8_RuneCount(const utf8_String *str) {
+int utf8_StringRuneCount(const utf8_String *str) {
 	// assertions
 	if (!str || !str->str) {
 		return -1; // error
@@ -273,7 +298,7 @@ int utf8_RuneCount(const utf8_String *str) {
 	assert(parser != NULL);
 
 	uint32_t i;
-	for (i = 0; !utf8_Parser_Get(parser, NULL); i++) {}
+	for (i = 0; !utf8_ParserGet(parser, NULL); i++) {}
 	utf8_Parser_free(parser);
 	return i;
 }
@@ -288,7 +313,7 @@ utf8_Rune utf8_readRune(const utf8_String *str, size_t len) {
 	return cp;
 }
 
-utf8_String *utf8_Parser_GetString(utf8_Parser *parser) {
+utf8_String *utf8_ParserGetString(utf8_Parser *parser) {
 	// assertions
 	if (!parser || !parser->str || !parser->str->str) {
 		return NULL; // error
@@ -301,14 +326,14 @@ utf8_String *utf8_Parser_GetString(utf8_Parser *parser) {
 // zero indicates success.
 // one indicates eof.
 // negative numbers are errors.
-int utf8_Parser_Get(utf8_Parser *parser, utf8_Rune *codepoint) {
+int utf8_ParserGet(utf8_Parser *parser, utf8_Rune *codepoint) {
 	// assertions
 	if (!parser || !parser->str || !parser->str->str) {
 		return -1; // error
 	}
 
 	utf8_Rune cp;
-	const utf8_String *str = utf8_Parser_GetString(parser);
+	const utf8_String *str = utf8_ParserGetString(parser);
 	if (!str) {
 		return -1;
 	}
@@ -344,7 +369,7 @@ int utf8_Parser_Get(utf8_Parser *parser, utf8_Rune *codepoint) {
 		parser->index += bl;
 	}
 
-	if (utf8_ValidRune(cp)) {
+	if (utf8_isValidRune(cp)) {
 		if (codepoint != NULL) {
 			*codepoint = cp; // allow nulls.
 		}
