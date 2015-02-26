@@ -154,11 +154,17 @@ bool utf8_strchkbom(const utf8_str *str) {
 
 // returns codepoint value of utf-8 character
 int32_t utf8_decode(const utf8_rune rune) {
+	// do not decode error runes
+	if (rune < 0) {
+		return utf8_RUNE_ERROR;
+	}
+
 	int32_t cp = 0;
 	// get number of bits.
 	int bl = utf8_runelen(rune);
 	if (bl < 0) {
-		return -1;
+		// out of bounds
+		return utf8_RUNE_ERROR;
 	} else if (bl == 0) {
 		bl = 1;
 	}
@@ -289,12 +295,16 @@ bool utf8_valid(const utf8_rune rune) {
 				uint8_t octet = ((int8_t  *) &rune)[i];
 
 				// RFC 3629 mandates the octets C0, C1, F5 to FF
-				// never appear. Furthermore, every byte is not
-				// zero except for ascii-compatible starting bytes,
-				// which these octets are not.
+				// never appear.
 				if (octet == 0xc0 || octet == 0xc1
-					|| (octet >= 0xf5 && octet <= 0xff) || octet == 0) {
+					|| (octet >= 0xf5 && octet <= 0xff)) {
 					return false; // invalid octet
+				} else if (i > 0 && ((octet & 0xc0) >> 6) != 2) {
+					// 0xc0 catches the first two bits,
+					// shifting by six places them at the last 2 bits.
+					// Furthermore, every byte has a 0b10 header except
+					// the first byte.
+					return false;
 				}
 			}
 		}
