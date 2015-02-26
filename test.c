@@ -15,9 +15,12 @@ bool test_valid_invalid() {
 }
 
 int main() {
+	// utf8_valid testing
 	if (test_valid_invalid()) {
 		puts("validation success.");
 	} else {
 		puts("validation failure.");
 	}
+
+	
 }

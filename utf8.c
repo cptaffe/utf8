@@ -314,7 +314,7 @@ int utf8_strlen(const utf8_str *str) {
 	assert(parser != NULL);
 
 	uint32_t i;
-	for (i = 0; utf8_pget(parser) >= 0; i++) {}
+	for (i = 0; utf8_pget(parser) >= 0; i++);
 	utf8_pfree(parser);
 	return i;
 }
