@@ -38,7 +38,9 @@ int32_t utf8_decode(const utf8_rune rune);
 
 // GetRune
 // takes a FILE pointer and returns a rune or 0 on eof.
-utf8_rune utf8_fget(FILE *file);
+#ifdef HAVE_STDIO
+utf8_rune utf8_fgetr(FILE *file);
+#endif // HAVE_STDIO
 
 // TODO: Add methods, splice out, or otherwise get rid of String.
 

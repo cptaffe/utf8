@@ -15,7 +15,7 @@ const utf8_str UTF8_BOM = {
 };
 
 // get Rune from file.
-utf8_rune utf8_fget(FILE *file) {
+utf8_rune utf8_fgetr(FILE *file) {
 	if (!file) {
 		return 0; // error
 	}
@@ -102,7 +102,7 @@ int utf8_strcmp(const utf8_str *a, const utf8_str *b) {
 }
 
 // returns the length of the current token.
-int utf8_runeslen(const utf8_str *str) {
+int utf8_runelens(const utf8_str *str) {
 	// assertions
 	if (!(str && str->str)) {
 		return -1;
@@ -150,20 +150,6 @@ bool utf8_strchkbom(const utf8_str *str) {
 		}
 	}
 	return false;
-}
-
-// allocates a string of ones and blanks for the length provided
-// from binary digits in bin.
-char *_print_binary(int32_t bin, size_t len) {
-	if (len > (sizeof(bin) * 8)) {
-		return NULL;
-	}
-	char *str = malloc(len + 1);
-	str[len] = 0;
-	for (int i = 0; i < (len); i++) {
-		bin & (1 << i) ? (str[(len - 1) - i] = '1') : (str[(len - 1) - i] = '_');
-	}
-	return str;
 }
 
 // returns codepoint value of utf-8 character
@@ -291,7 +277,29 @@ utf8_rune utf8_encode(const uint32_t cp) {
 // checks byte for validity.
 bool utf8_valid(const utf8_rune rune) {
 	// TODO: implement validation tests.
-	return true;
+
+	// RFC 3629 mandates the the first byte indicate
+	// number of following bytes.
+	int len = utf8_runelen(rune);
+	if (len < 0) {
+		return false;
+	} else {
+		if (len > 0) {
+			for (int i = 0; i < len; i++) {
+				uint8_t octet = ((int8_t  *) &rune)[i];
+
+				// RFC 3629 mandates the octets C0, C1, F5 to FF
+				// never appear. Furthermore, every byte is not
+				// zero except for ascii-compatible starting bytes,
+				// which these octets are not.
+				if (octet == 0xc0 || octet == 0xc1
+					|| (octet >= 0xf5 && octet <= 0xff) || octet == 0) {
+					return false; // invalid octet
+				}
+			}
+		}
+		return true;
+	}
 }
 
 // negative values are errors

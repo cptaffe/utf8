@@ -7,9 +7,9 @@ LIB = libutf8.o
 #LIBS=
 CFLAGS+=-g  #-I$(dir $(LIBS))
 
-.PHONY: all clean
+.PHONY: all clean test
 
-all: $(LIB)
+all: $(LIB) test
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $?
@@ -23,3 +23,7 @@ $(LIB): $(OBJ) $(LIBS)
 clean:
 	$(RM) $(LIB) $(OBJ)
 	$(foreach var,$(LIBS), $(MAKE) $(MAKEFLAGS) -C $(dir $(var)) clean;)
+
+test: test.o $(LIB)
+	$(CC) $(CFLAGS) -o test $^
+	./test
