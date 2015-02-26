@@ -15,6 +15,12 @@
 // negative values are considered errors.
 typedef int32_t utf8_rune;
 
+// Rune value defines
+enum {
+	utf8_RUNE_ERROR = INT32_MIN,
+	utf8_RUNE_INVALID,
+};
+
 // RuneLen
 // accepts a Rune and returns its length in bytes.
 int utf8_runelen(const utf8_rune r);

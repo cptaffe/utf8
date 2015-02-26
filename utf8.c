@@ -17,7 +17,7 @@ const utf8_str UTF8_BOM = {
 // get Rune from file.
 utf8_rune utf8_fgetr(FILE *file) {
 	if (!file) {
-		return 0; // error
+		return utf8_RUNE_ERROR; // error
 	}
 
 	utf8_rune c = getc(file);
@@ -40,7 +40,7 @@ utf8_rune utf8_fgetr(FILE *file) {
 	if (utf8_valid(c)) {
 		return c;
 	} else {
-		return 0;
+		return utf8_RUNE_INVALID;
 	}
 }
 
@@ -207,7 +207,7 @@ utf8_rune utf8_encode(const uint32_t cp) {
 		bl = 4;
 	} else {
 		// not an encodeable character value
-		return -1; // error
+		return utf8_RUNE_ERROR; // error
 	}
 
 	if (bl == 1) {
@@ -321,11 +321,15 @@ int utf8_strlen(const utf8_str *str) {
 
 utf8_rune utf8_readrune(const utf8_str *str, size_t len) {
 	// assertions
-	assert(str && str->str);
-	assert(len <= sizeof(utf8_rune));
+	if(!(str && str->str) || !(len <= sizeof(utf8_rune))) {
+		return utf8_RUNE_ERROR;
+	}
 
 	utf8_rune cp;
-	memcpy(&cp, str->str, len);
+	void *mem = memcpy(&cp, str->str, len);
+	if (!mem) {
+		return utf8_RUNE_ERROR;
+	}
 	return cp;
 }
 
@@ -345,19 +349,20 @@ utf8_str *utf8_pgets(utf8_parser *parser) {
 utf8_rune utf8_pget(utf8_parser *parser) {
 	// assertions
 	if (!parser || !parser->str || !parser->str->str) {
-		return -1; // error
+		return utf8_RUNE_ERROR;
 	}
 
 	utf8_rune cp;
 	const utf8_str *str = utf8_pgets(parser);
 	if (!str) {
-		return -1;
+		return utf8_RUNE_ERROR;
 	}
 
 	// get byte length of token.
 	const int bl = utf8_strlen(str);
 	if (bl < 0 || bl > str->len) {
-		return bl; // error
+		// byte length out of bounds
+		return utf8_RUNE_ERROR;
 	}
 
 	if (bl == 0) {
@@ -370,7 +375,7 @@ utf8_rune utf8_pget(utf8_parser *parser) {
 		}
 	} else if (bl == 1) {
 		// unsupported character
-		return 1;
+		return utf8_RUNE_INVALID;
 	} else {
 		// multi-byte unicode value
 		// check for first two bits are 10
@@ -388,6 +393,7 @@ utf8_rune utf8_pget(utf8_parser *parser) {
 	if (utf8_valid(cp)) {
 		return cp;
 	} else {
-		return -2; // error
+		// invalid rune
+		return utf8_RUNE_INVALID;
 	}
 }
