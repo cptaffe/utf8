@@ -8,9 +8,9 @@
 #include "utf8.h"
 
 // utf8 byte order mark.
-const uint8_t _bom[] = {0xef, 0xbb, 0xbf};
+const char _bom[] = {0xef, 0xbb, 0xbf};
 const utf8_String UTF8_BOM = {
-	.str = (uint8_t *) _bom,
+	.str = (char *) _bom,
 	.len = sizeof(_bom)
 };
 
@@ -61,7 +61,7 @@ void utf8_Parser_free(utf8_Parser *parser) {
 	free(parser);
 }
 
-utf8_String *utf8_String_initLen(const uint8_t *str, size_t len) {
+utf8_String *utf8_String_initLen(const char *str, size_t len) {
 	// assertions
 	if (!str) {
 		return NULL;
@@ -78,7 +78,7 @@ utf8_String *utf8_String_initLen(const uint8_t *str, size_t len) {
 	return string;
 }
 
-utf8_String *utf8_String_init(const uint8_t *str) {
+utf8_String *utf8_String_init(const char *str) {
 	return utf8_String_initLen(str, strlen((const char *) str));
 }
 
@@ -167,11 +167,15 @@ char *_print_binary(int32_t bin, size_t len) {
 }
 
 // returns codepoint value of utf-8 character
-int utf8_RuneDecode(const utf8_Rune rune, uint32_t *cp) {
+int32_t utf8_DecodeRune(const utf8_Rune rune) {
+	int32_t cp = 0;
 	// get number of bits.
 	int bl = utf8_RuneLen(rune);
-	assert(bl >= 0 && bl <= 8);
-	if (bl == 0) {bl = 1;}
+	if (bl < 0) {
+		return -1;
+	} else if (bl == 0) {
+		bl = 1;
+	}
 
 	// forge mask
 	utf8_Rune mask = 0;
@@ -179,11 +183,11 @@ int utf8_RuneDecode(const utf8_Rune rune, uint32_t *cp) {
 		mask += (1 << i);
 	}
 
-	*cp = rune & mask;
+	cp = rune & mask;
 	// byte order is backwards on this machine (endianness).
 	// shift first bits by the the number of bits in each
 	// subsequent byte (6) once for every remaining byte (bl)
-	*cp <<= (bl - 1) * 6;
+	cp <<= (bl - 1) * 6;
 	mask = 0x3f;
 	for (int i = 1; i < bl; i++) {
 		// for each byte after the 1st, do:
@@ -195,14 +199,15 @@ int utf8_RuneDecode(const utf8_Rune rune, uint32_t *cp) {
 		// give the shift needed to place lower bytes near
 		// the first byte and provide the inverse ordering needed
 		// to get a correct number.
-		*cp |= (c << (((bl - i) - 1) * 6));
+		cp |= (c << (((bl - i) - 1) * 6));
 	}
 
-	return 0;
+	return cp;
 }
 
 // returns encoded rune from codepoint
-int utf8_RuneEncode(const uint32_t cp, utf8_Rune *rune) {
+utf8_Rune utf8_EncodeRune(const uint32_t cp) {
+	utf8_Rune rune = 0;
 	// get number of bytes
 	int bl = 0;
 	// limits as indicated in RFC 3629.
@@ -216,11 +221,11 @@ int utf8_RuneEncode(const uint32_t cp, utf8_Rune *rune) {
 		bl = 4;
 	} else {
 		// not an encodeable character value
-		return 1; // error
+		return -1; // error
 	}
 
 	if (bl == 1) {
-		*rune = (utf8_Rune) cp; // no special transform
+		rune = (utf8_Rune) cp; // no special transform
 	} else {
 		uint32_t mask = 0;
 		uint32_t code = 0;
@@ -276,10 +281,10 @@ int utf8_RuneEncode(const uint32_t cp, utf8_Rune *rune) {
 			// starting from here, we can position it properly
 			c <<= (i * 8);
 			code |= c;
+			rune = code;
 		}
-		*rune = code;
 	}
-	return bl;
+	return rune;
 }
 
 
@@ -301,7 +306,7 @@ int utf8_RuneCountInString(const utf8_String *str) {
 	assert(parser != NULL);
 
 	uint32_t i;
-	for (i = 0; !utf8_ParserGet(parser, NULL); i++) {}
+	for (i = 0; utf8_ParserGet(parser) >= 0; i++) {}
 	utf8_Parser_free(parser);
 	return i;
 }
@@ -329,7 +334,7 @@ utf8_String *utf8_ParserGetString(utf8_Parser *parser) {
 // zero indicates success.
 // one indicates eof.
 // negative numbers are errors.
-int utf8_ParserGet(utf8_Parser *parser, utf8_Rune *codepoint) {
+utf8_Rune utf8_ParserGet(utf8_Parser *parser) {
 	// assertions
 	if (!parser || !parser->str || !parser->str->str) {
 		return -1; // error
@@ -373,10 +378,7 @@ int utf8_ParserGet(utf8_Parser *parser, utf8_Rune *codepoint) {
 	}
 
 	if (utf8_isValidRune(cp)) {
-		if (codepoint != NULL) {
-			*codepoint = cp; // allow nulls.
-		}
-		return 0;
+		return cp;
 	} else {
 		return -2; // error
 	}
