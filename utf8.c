@@ -193,7 +193,7 @@ int32_t utf8_decode(const utf8_rune rune) {
 }
 
 // returns encoded rune from codepoint
-utf8_rune utf8_encode(const uint32_t cp) {
+utf8_rune utf8_encode(const int32_t cp) {
 
 	utf8_rune rune = 0;
 	// get number of bytes

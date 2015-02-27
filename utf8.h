@@ -49,7 +49,7 @@ bool utf8_isvalid(const utf8_rune cp);
 // it returns a 64-bit signed integer that either
 // represents the size of the rune, or a negative value
 // representing an error.
-utf8_rune utf8_encode(const uint32_t cp);
+utf8_rune utf8_encode(const int32_t cp);
 
 // utf8_decode
 // accepts a Rune and a 4-byte codepoint pointer.
