@@ -9,44 +9,47 @@
 #include <stddef.h>
 #include <stdio.h>
 
-// Rune
-// a Rune is a single utf-8 encoded character,
+
+#ifdef HAVE_STDIO
+
+// utf8_fgetr
+// takes a FILE pointer and returns a rune or 0 on eof.
+utf8_rune utf8_fget(FILE *file);
+
+#endif // HAVE_STDIO
+
+// utf8_rune
+// a rune is a single utf-8 encoded character,
 // stored in a 4-byte integer.
 // negative values are considered errors.
 typedef int32_t utf8_rune;
 
-// Rune value defines
+// rune value defines
 enum {
 	utf8_RUNE_ERROR = INT32_MIN,
 	utf8_RUNE_INVALID,
 };
 
-// RuneLen
+// utf8_runelen
 // accepts a Rune and returns its length in bytes.
 int utf8_runelen(const utf8_rune r);
 
-// isValidRune
+// utf8_isvalid
 // accepts a Rune and returns whether it is
 // a valid character as a bool.
-bool utf8_valid(const utf8_rune cp);
+bool utf8_isvalid(const utf8_rune cp);
 
-// RuneEncode
+// utf8_encode
 // accepts a 4-byte codepoint and a pointer to a Rune.
 // it returns a 64-bit signed integer that either
 // represents the size of the rune, or a negative value
 // representing an error.
 utf8_rune utf8_encode(const uint32_t cp);
 
-// RuneDecode
+// utf8_decode
 // accepts a Rune and a 4-byte codepoint pointer.
 // it returns an integer that indicates error on non-zero values.
 int32_t utf8_decode(const utf8_rune rune);
-
-// GetRune
-// takes a FILE pointer and returns a rune or 0 on eof.
-#ifdef HAVE_STDIO
-utf8_rune utf8_fgetr(FILE *file);
-#endif // HAVE_STDIO
 
 // TODO: Add methods, splice out, or otherwise get rid of String.
 
@@ -60,26 +63,26 @@ typedef struct {
 
 extern const utf8_str UTF8_BOM;
 
-// String_init
+// utf8_strinit
 // accepts a c-string, and returns a String pointer,
 // this pointer, if null, indicates an error.
 // the pointer must be free'd by String_free.
 utf8_str *utf8_strinit(const char *str);
 
-// String_free
+// utf8_strfree
 // accepts a String to free and returns nothing.
 void utf8_strfree(utf8_str *str);
 
-// RuneCountInString
+// utf8_strlen
 // returns the number of Runes in a String.
 int utf8_strlen(const utf8_str *str);
 
-// StringRuneLen
+// utf8_runeslen
 // accepts a String and returns the length of
 // the first Rune in bytes.
 int utf8_runeslen(const utf8_str *str);
 
-// StringBomCheck
+// utf8_strchkbom
 // accepts a String and checks for a
 // byte-order-mark at the beginning of the string.
 bool utf8_strchkbom(const utf8_str *str);
@@ -93,24 +96,24 @@ typedef struct {
 	size_t index;
 } utf8_parser;
 
-// Parser_init
+// utf8_pinit
 // accepts a String as input, and returns
 // a Parser pointer. If the pointer is null,
 // an error has occured. The pointer must be free'd by
 // Parser_free.
 utf8_parser *utf8_pinit(const utf8_str *str);
 
-// Parser_free
+// utf8_pfree
 // accepts a parser to free and returns nothing.
 void utf8_pfree(utf8_parser *p);
 
-// ParserGet
+// utf8_pget
 // accepts a Parser and a Rune pointer codepoint.
 // on success codepoint will point contain a parsed rune,
 // on error a non-zero value will be returned.
 utf8_rune utf8_pget(utf8_parser *p);
 
-// ParserGetString
+// utf8_pgets
 // returns string of as yet unparsed runes.
 utf8_str *utf8_pgets(utf8_parser *p);
 
