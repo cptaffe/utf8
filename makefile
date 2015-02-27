@@ -5,8 +5,8 @@ TEST = test.c
 OBJ := $(SRC:.c=.o)
 LIB = libutf8.o
 
-#LIBS=
-CFLAGS+=-g  #-I$(dir $(LIBS))
+LIBS=
+CFLAGS+=-g  $(addprefix -I, $(dir $(LIBS)))
 
 .PHONY: all clean test
 
