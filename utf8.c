@@ -7,16 +7,18 @@
 
 #include "utf8.h"
 
+const int utf8_CODEPOINT_MAX = 0x10ffff;
+
 // utf-8 byte order mark (bom).
 const char UTF8_BOM[] = {0xef, 0xbb, 0xbf, 0x0};
 
 // get Rune from file.
-utf8_rune utf8_fgetr(FILE *file) {
+utf8_rune utf8_fget(FILE *file) {
 	if (!file) {
 		return utf8_RUNE_ERROR; // error
 	}
 
-	utf8_rune c = getc(file);
+	utf8_rune c = fgetc(file);
 	if (c == EOF) {
 		return 0;
 	}
@@ -25,7 +27,7 @@ utf8_rune utf8_fgetr(FILE *file) {
 		return 0;
 	}
 	for (int i = 1; i < len; i++) {
-		char j = getc(file);
+		char j = fgetc(file);
 		if (j == EOF) {
 			return 0;
 		}
@@ -38,6 +40,22 @@ utf8_rune utf8_fgetr(FILE *file) {
 	} else {
 		return utf8_RUNE_INVALID;
 	}
+}
+
+int utf8_funget(FILE *file, const utf8_rune r) {
+	if (!file) {
+		return 1; // error
+	} else if (r < 0 || r > utf8_CODEPOINT_MAX) {
+		return 2; // error
+	}
+
+	for (int i = 3; i >= 0; i--) {
+		int ret = ungetc(((uint8_t *) &r)[i], file);
+		if (ret == EOF) {
+			return 3; // error
+		}
+	}
+	return 0;
 }
 
 // returns null on failure

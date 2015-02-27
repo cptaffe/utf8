@@ -9,12 +9,17 @@
 #include <stddef.h>
 #include <stdio.h>
 
+extern const int utf8_CODEPOINT_MAX;
 
 #ifdef HAVE_STDIO
 
-// utf8_fgetr
+// utf8_fget
 // takes a FILE pointer and returns a rune or 0 on eof.
 utf8_rune utf8_fget(FILE *file);
+
+// utf8_funget
+// takes a FILE pointer and pushes a rune, returns non-zero on error.
+int utf8_funget(FILE *file, const utf8_rune r);
 
 #endif // HAVE_STDIO
 
