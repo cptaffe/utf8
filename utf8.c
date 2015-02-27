@@ -8,11 +8,7 @@
 #include "utf8.h"
 
 // utf-8 byte order mark (bom).
-const char _bom[] = {0xef, 0xbb, 0xbf};
-const utf8_str UTF8_BOM = {
-	.str = (char *) _bom,
-	.len = sizeof(_bom)
-};
+const char UTF8_BOM[] = {0xef, 0xbb, 0xbf, 0x0};
 
 // get Rune from file.
 utf8_rune utf8_fgetr(FILE *file) {
@@ -45,7 +41,7 @@ utf8_rune utf8_fgetr(FILE *file) {
 }
 
 // returns null on failure
-utf8_parser *utf8_pinit(const utf8_str *str) {
+utf8_parser *utf8_pinit(const char *str) {
 	// assertions
 	if (!str) {
 		return NULL;
@@ -61,63 +57,44 @@ void utf8_pfree(utf8_parser *parser) {
 	free(parser);
 }
 
-utf8_str *utf8_strlinit(const char *str, size_t len) {
-	// assertions
-	if (!str) {
-		return NULL;
-	}
-
-	// alloc string
-	utf8_str *string = malloc(sizeof(utf8_str));
-	if (!string) {
-		return NULL;
-	}
-
-	string->str = str;
-	string->len = len;
-	return string;
-}
-
-utf8_str *utf8_strinit(const char *str) {
-	return utf8_strlinit(str, strlen((const char *) str));
-}
-
-void utf8_strfree(utf8_str *str) {
-	free(str);
-}
-
 // compare two strings (not length dependent)
-int utf8_strcmp(const utf8_str *a, const utf8_str *b) {
+int utf8_strcmp(const char *a, const char *b) {
 	// assertions
 	assert(a && b);
 
-	size_t len;
-	if (a->len >= b->len) {
-		len = a->len;
+	size_t alen, blen, len;
+	if ((alen = strlen(a)) >= (blen = strlen(b))) {
+		len = alen;
 	} else {
-		len = b->len;
+		len = blen;
 	}
 
-	return strncmp((const char *) a->str, (const char *) b->str, len);
+	return strncmp(a, b, len);
 }
 
 // returns the length of the current token.
-int utf8_runelens(const utf8_str *str) {
+int utf8_runelens(const char *str) {
 	// assertions
-	if (!(str && str->str)) {
+	if (!str) {
 		return -1;
 	}
 
-	utf8_rune r = 0;
-	// copy the shortest length (string or rune).
-	void *ret = memcpy(&r, str->str,
-		(str->len > sizeof(utf8_rune)) ? sizeof(utf8_rune) : str->len);
-	if (!ret) {
-		return -1;
+	size_t len = strlen(str);
+	if (len < 4) {
+		// str is too short to be used as a rune.
+		utf8_rune r = 0;
+		// copy the shortest length (string or rune).
+		void *ret = memcpy(&r, str,
+			(len > sizeof(utf8_rune)) ? sizeof(utf8_rune) : len);
+		if (!ret) {
+			return -1;
+		}
+		// return len from rune.
+		return utf8_runelen((const utf8_rune) r);
+	} else {
+		// return len from rune.
+		return utf8_runelen(*((utf8_rune *) str));
 	}
-
-	// return len from rune.
-	return utf8_runelen((const utf8_rune) r);
 }
 
 int utf8_runelen(const utf8_rune r) {
@@ -142,10 +119,10 @@ int utf8_runelen(const utf8_rune r) {
 }
 
 // checks for bom, if found, increments over it.
-bool utf8_strchkbom(const utf8_str *str) {
+bool utf8_strchkbom(const char *str) {
 	// length safety
-	if (str->len >= sizeof(UTF8_BOM)) {
-		if (utf8_strcmp(str, &UTF8_BOM)) {
+	if (strlen(str) >= sizeof(UTF8_BOM)) {
+		if (utf8_strcmp(str, UTF8_BOM)) {
 			return true;
 		}
 	}
@@ -265,7 +242,7 @@ utf8_rune utf8_encode(const uint32_t cp) {
 
 		// now we iterate over the next bytes and mask their bits.
 		for (int i = 1; i < bl; i++) {
-			// 6 bit mask for each byte.
+			// 6 bit mask for each byte, 0x3f = 0b00111111.
 			// we shift the mask by the inverse of our counter
 			// (we order the last parts to the beginning), and
 			// subtract one because we only do this for bytes
@@ -314,15 +291,17 @@ bool utf8_isvalid(const utf8_rune rune) {
 }
 
 // negative values are errors
-int utf8_strlen(const utf8_str *str) {
+int utf8_strlen(const char *str) {
 	// assertions
-	if (!str || !str->str) {
+	if (!str) {
 		return -1; // error
 	}
 
 	// assert init was successful
 	utf8_parser *parser = utf8_pinit(str);
-	assert(parser != NULL);
+	if (!parser) {
+		return -1;
+	}
 
 	uint32_t i;
 	for (i = 0; utf8_pget(parser) >= 0; i++);
@@ -330,27 +309,27 @@ int utf8_strlen(const utf8_str *str) {
 	return i;
 }
 
-utf8_rune utf8_readrune(const utf8_str *str, size_t len) {
+utf8_rune utf8_readrune(const char *str, size_t len) {
 	// assertions
-	if(!(str && str->str) || !(len <= sizeof(utf8_rune))) {
+	if(!str || !(len <= sizeof(utf8_rune))) {
 		return utf8_RUNE_ERROR;
 	}
 
 	utf8_rune cp;
-	void *mem = memcpy(&cp, str->str, len);
+	void *mem = memcpy(&cp, str, len);
 	if (!mem) {
 		return utf8_RUNE_ERROR;
 	}
 	return cp;
 }
 
-utf8_str *utf8_pgets(utf8_parser *parser) {
+const char *utf8_pgets(utf8_parser *parser) {
 	// assertions
-	if (!parser || !parser->str || !parser->str->str) {
+	if (!parser || !parser->str) {
 		return NULL; // error
 	}
 
-	return utf8_strlinit(&parser->str->str[parser->index], parser->str->len - parser->index);
+	return &parser->str[parser->index];
 }
 
 // return values:
@@ -359,26 +338,26 @@ utf8_str *utf8_pgets(utf8_parser *parser) {
 // negative numbers are errors.
 utf8_rune utf8_pget(utf8_parser *parser) {
 	// assertions
-	if (!parser || !parser->str || !parser->str->str) {
+	if (!parser || !parser->str) {
 		return utf8_RUNE_ERROR;
 	}
 
 	utf8_rune cp;
-	const utf8_str *str = utf8_pgets(parser);
+	const char *str = utf8_pgets(parser);
 	if (!str) {
 		return utf8_RUNE_ERROR;
 	}
 
 	// get byte length of token.
 	const int bl = utf8_strlen(str);
-	if (bl < 0 || bl > str->len) {
+	if (bl < 0) {
 		// byte length out of bounds
 		return utf8_RUNE_ERROR;
 	}
 
 	if (bl == 0) {
 		// standard ascii value
-		if (str->str[0] == 0) {
+		if (str[0] == 0) {
 			return 1; // eof, error
 		} else {
 			cp = utf8_readrune(str, 1);
@@ -393,7 +372,7 @@ utf8_rune utf8_pget(utf8_parser *parser) {
 		uint8_t mask = (1 << 6) + (1 << 7);
 		for (int i = 1; i < bl; i++) {
 			// TODO: testing!
-			if ((str->str[i] & mask) != (1 << 7)) {
+			if ((str[i] & mask) != (1 << 7)) {
 				return -1; // error
 			}
 		}
