@@ -7,55 +7,125 @@
 
 #include "utf8.h"
 
-const int utf8_CODEPOINT_MAX = 0x10ffff;
+const int32_t utf8_CODEPOINT_MAX = 0x10ffff;
+const size_t utf8_RUNE_MAXLEN = 4;
 
 // utf-8 byte order mark (bom).
 const char UTF8_BOM[] = {0xef, 0xbb, 0xbf, 0x0};
 
-// get Rune from file.
-utf8_rune utf8_fget(FILE *file) {
-	if (!file) {
-		return utf8_RUNE_ERROR; // error
+// reads rune from arbitrary memory
+utf8_rune utf8_getr(const void *mem, size_t size) {
+	// safety checks
+	if (!mem || !size) {
+		return utf8_RUNE_ERROR;
 	}
 
-	utf8_rune c = fgetc(file);
-	if (c == EOF) {
-		return 0;
-	}
-	int len = utf8_runelen(c);
-	if (len < 0) {
-		return 0;
-	}
-	for (int i = 1; i < len; i++) {
-		char j = fgetc(file);
-		if (j == EOF) {
-			return 0;
+	uint8_t *bytes = (uint8_t *) mem;
+
+	// check if first byte is a starting byte.
+	if (utf8_isstartbyte(bytes[0])) {
+		// decode rune
+		int len = utf8_runelen(bytes[0]);
+		if (len > 0) {
+			if (len <= size) {
+				// copy rune
+				utf8_rune rune = 0;
+				memcpy(&rune, mem, len);
+
+				// check for valid following characters
+				for (int i = 1; i < len; i++) {
+					if ((((uint8_t *) &rune)[i] & 0xc0) != 0x80) {
+						// puts("subsequent byte lacks 10 heading.");
+						return utf8_RUNE_INVALID;
+					}
+				}
+
+				// have good rune.
+				return rune;
+			} else {
+				return utf8_RUNE_SHORT;
+			}
+		} else {
+			return utf8_RUNE_INVALID;
 		}
-		((uint8_t *) &c)[i] = j;
-	}
-
-	// check for validity.
-	if (utf8_isvalid(c)) {
-		return c;
 	} else {
 		return utf8_RUNE_INVALID;
 	}
 }
 
-int utf8_funget(FILE *file, const utf8_rune r) {
-	if (!file) {
-		return 1; // error
-	} else if (r < 0 || r > utf8_CODEPOINT_MAX) {
-		return 2; // error
+// allocate zeroed memory
+static inline void *alloc(size_t size) {
+	return calloc(size, 1);
+}
+
+// returns null on failure
+utf8_parser *utf8_pinit(const char *str) {
+	// assertions
+	if (!str) {
+		return NULL;
 	}
 
-	for (int i = 3; i >= 0; i--) {
-		int ret = ungetc(((uint8_t *) &r)[i], file);
-		if (ret == EOF) {
-			return 3; // error
-		}
+	utf8_parser *p = alloc(sizeof(utf8_parser));
+	p->str = str;
+	return p;
+}
+
+void utf8_pfree(utf8_parser *parser) {
+	free(parser);
+}
+
+utf8_rune utf8_pget(utf8_parser *parser) {
+	// assertions
+	if (!parser || !parser->str) {
+		return utf8_RUNE_ERROR;
 	}
-	return 0;
+
+	const char *str = &parser->str[parser->index];
+	// strlen excludes the null terminator, which we need to parse.
+	utf8_rune rune = utf8_getr(str, strlen(str) + 1);
+	if (utf8_isvalid(rune)) {
+		parser->index += utf8_runelen(parser->str[parser->index]);
+	}
+	return rune; // propogate error, if exists
+}
+
+// used for finding start rune
+bool utf8_isstartbyte(const uint8_t rune) {
+	// first bit is 0 or first two bits are 11.
+	return ((rune & 0xc0) == 0xc0 || (rune & 0x80) == 0);
+}
+
+int utf8_runelen(const uint8_t byte) {
+	// build mask
+	uint8_t mask = 0;
+	int bytelength = 0;
+
+	for (int i = utf8_RUNE_MAXLEN - 1; i >= 0; i--) {
+		mask |= 1 << (i + (8 - utf8_RUNE_MAXLEN)); // eight is bits in a byte.
+		if ((byte & mask) != mask) {
+			// find maximum bits set before zero bit is found.
+			break;
+		}
+		bytelength++;
+	}
+
+	if (bytelength == 1) {
+		return -1; // error, invalid rune header.
+	} else if (!bytelength) {
+		bytelength++;
+	}
+
+	return bytelength;
+}
+
+// returns the length of the current token.
+int utf8_runelens(const char *str) {
+	// assertions
+	if (!str) {
+		return -1;
+	}
+
+	return utf8_runelen(str[0]);
 }
 
 // compare two strings (not length dependent)
@@ -73,55 +143,6 @@ int utf8_strcmp(const char *a, const char *b) {
 	return strncmp(a, b, len);
 }
 
-// returns the length of the current token.
-int utf8_runelens(const char *str) {
-	// assertions
-	if (!str) {
-		return -1;
-	}
-
-	size_t len = strlen(str);
-	if (len < 4) {
-		// str is too short to be used as a rune.
-		utf8_rune r = 0;
-		// copy the shortest length (string or rune).
-		void *ret = memcpy(&r, str,
-			(len > sizeof(utf8_rune)) ? sizeof(utf8_rune) : len);
-		if (!ret) {
-			return -1;
-		}
-		// return len from rune.
-		return utf8_runelen((const utf8_rune) r);
-	} else {
-		// return len from rune.
-		return utf8_runelen(*((utf8_rune *) str));
-	}
-}
-
-int utf8_runelen(const utf8_rune r) {
-	// 4 are in utf-8, 6 was the first spec.
-	const int max_bytes = 4; // arbitrary maximum, 0 <= max_bytes <= 8
-
-	// build mask
-	uint8_t mask = 0;
-	int bytelength = 0;
-	uint8_t *rune = (uint8_t *) &r;
-
-	for (int i = max_bytes - 1; i >= 0; i--) {
-		mask |= 1 << (i + (8 - max_bytes)); // eight is bits in a byte.
-		if ((rune[0] & mask) != mask) {
-			// find maximum bits set before zero bit is found.
-			break;
-		}
-		bytelength++;
-	}
-
-	if (bytelength == 1) {
-		return -1; // error, invalid rune header.
-	}
-	return bytelength;
-}
-
 // checks for bom, if found, increments over it.
 bool utf8_strchkbom(const char *str) {
 	// length safety
@@ -133,14 +154,23 @@ bool utf8_strchkbom(const char *str) {
 	return false;
 }
 
-// used for finding start rune
-bool utf8_isstartbyte(const uint8_t rune) {
-	// first bit is 0 or first two bits are 11.
-	if ((rune & 0xc0) == 0xc0 || (rune & 0x80) == 0) {
-		return true;
-	} else {
-		return false;
+// negative values are errors
+int utf8_strlen(const char *str) {
+	// assertions
+	if (!str) {
+		return -1; // error
 	}
+
+	// assert init was successful
+	utf8_parser *parser = utf8_pinit(str);
+	if (!parser) {
+		return -1;
+	}
+
+	uint32_t i;
+	for (i = 0; utf8_pget(parser) >= 0; i++);
+	utf8_pfree(parser);
+	return i;
 }
 
 // returns codepoint value of utf-8 character
@@ -153,10 +183,10 @@ int32_t utf8_decode(const utf8_rune rune) {
 	int32_t cp = 0;
 	// get number of bits.
 	int bl = utf8_runelen(rune);
-	if (bl < 0) {
+	if (bl <= 0) {
 		// out of bounds
 		return utf8_CP_INVALID;
-	} else if (bl == 0) {
+	} else if (bl == 1) {
 		return rune; // rune is code-point.
 	}
 
@@ -279,140 +309,25 @@ bool utf8_isvalid(const utf8_rune rune) {
 	// RFC 3629 mandates the the first byte indicate
 	// number of following bytes.
 	int len = utf8_runelen(rune);
-	if (len < 0) {
+	if (len <= 0) {
 		return false;
 	} else {
-		if (len > 0) {
-			for (int i = 0; i < len; i++) {
-				uint8_t octet = ((int8_t  *) &rune)[i];
+		for (int i = 0; i < len; i++) {
+			uint8_t octet = ((int8_t  *) &rune)[i];
 
-				// RFC 3629 mandates the octets C0, C1, F5 to FF
-				// never appear.
-				if (octet == 0xc0 || octet == 0xc1
-					|| (octet >= 0xf5 && octet <= 0xff)) {
-					return false; // invalid octet
-				} else if (i > 0 && ((octet & 0xc0) >> 6) != 2) {
-					// 0xc0 catches the first two bits,
-					// shifting by six places them at the last 2 bits.
-					// Furthermore, every byte has a 0b10 header except
-					// the first byte.
-					return false;
-				}
+			// RFC 3629 mandates the octets C0, C1, F5 to FF
+			// never appear.
+			if (octet == 0xc0 || octet == 0xc1
+				|| (octet >= 0xf5 && octet <= 0xff)) {
+				return false; // invalid octet
+			} else if (i > 0 && ((octet & 0xc0) >> 6) != 2) {
+				// 0xc0 catches the first two bits,
+				// shifting by six places them at the last 2 bits.
+				// Furthermore, every byte has a 0b10 header except
+				// the first byte.
+				return false;
 			}
 		}
 		return true;
-	}
-}
-
-// negative values are errors
-int utf8_strlen(const char *str) {
-	// assertions
-	if (!str) {
-		return -1; // error
-	}
-
-	// assert init was successful
-	utf8_parser *parser = utf8_pinit(str);
-	if (!parser) {
-		return -1;
-	}
-
-	uint32_t i;
-	for (i = 0; utf8_pget(parser) >= 0; i++);
-	utf8_pfree(parser);
-	return i;
-}
-
-utf8_rune utf8_readrune(const char *str, size_t len) {
-	// assertions
-	if(!str || !(len <= sizeof(utf8_rune))) {
-		return utf8_RUNE_ERROR;
-	}
-
-	utf8_rune cp;
-	void *mem = memcpy(&cp, str, len);
-	if (!mem) {
-		return utf8_RUNE_ERROR;
-	}
-	return cp;
-}
-
-// allocate zeroed memory
-static inline void *alloc(size_t size) {
-	return calloc(size, 1);
-}
-
-// returns null on failure
-utf8_parser *utf8_pinit(const char *str) {
-	// assertions
-	if (!str) {
-		return NULL;
-	}
-
-	utf8_parser *p = alloc(sizeof(utf8_parser));
-	p->str = str;
-	return p;
-}
-
-void utf8_pfree(utf8_parser *parser) {
-	free(parser);
-}
-
-const char *utf8_pgets(utf8_parser *parser) {
-	// assertions
-	if (!parser || !parser->str) {
-		return NULL; // error
-	}
-
-	return &parser->str[parser->index];
-}
-
-// return values:
-// zero indicates success.
-// one indicates eof.
-// negative numbers are errors.
-utf8_rune utf8_pget(utf8_parser *parser) {
-	// assertions
-	if (!parser || !parser->str) {
-		return utf8_RUNE_ERROR;
-	}
-
-	utf8_rune cp;
-	const char *str = utf8_pgets(parser);
-	if (!str) {
-		return utf8_RUNE_ERROR;
-	}
-
-	// get byte length of token.
-	const int bl = utf8_runelens(str);
-	if (bl < 0) {
-		// byte length out of bounds
-		return utf8_RUNE_INVALID;
-	}
-
-	if (bl == 0) {
-		// standard ascii value
-		cp = utf8_readrune(str, 1);
-		parser->index++;
-	} else if (bl == 1) {
-		// unsupported character
-		return utf8_RUNE_INVALID;
-	} else {
-		// multi-byte unicode value
-		// check for first two bits are 10
-		for (int i = 1; i < bl; i++) {
-			if ((str[i] & 0xc0) != 0x80) {
-				return utf8_RUNE_INVALID; // error
-			}
-		}
-		cp = utf8_readrune(str, bl);
-		parser->index += bl;
-	}
-
-	if (utf8_isvalid(cp)) {
-		return cp;
-	} else {
-		// invalid rune
-		return utf8_RUNE_INVALID;
 	}
 }

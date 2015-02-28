@@ -10,24 +10,17 @@
 #include <stdio.h>
 
 extern const int utf8_CODEPOINT_MAX;
-
-#ifdef HAVE_STDIO
-
-// utf8_fget
-// takes a FILE pointer and returns a rune or 0 on eof.
-utf8_rune utf8_fget(FILE *file);
-
-// utf8_funget
-// takes a FILE pointer and pushes a rune, returns non-zero on error.
-int utf8_funget(FILE *file, const utf8_rune r);
-
-#endif // HAVE_STDIO
+extern const size_t utf8_RUNE_MAXLEN;
 
 // utf8_rune
 // a rune is a single utf-8 encoded character,
 // stored in a 4-byte integer.
 // negative values are considered errors.
 typedef int32_t utf8_rune;
+
+// utf8_getr
+// returns a rune from some memory, of max length size.
+utf8_rune utf8_getr(const void *mem, size_t size);
 
 // rune value defines
 enum {
@@ -38,12 +31,14 @@ enum {
 enum {
 	// 0xc0 and 0xc1 are guaranteed not to appear.
 	utf8_RUNE_ERROR = 0xc0,
-	utf8_RUNE_INVALID
+	utf8_RUNE_INVALID,
+	// 0xf5-0xff are guaranteed to not be valid.
+	utf8_RUNE_SHORT = 0xf5,
 };
 
 // utf8_runelen
-// accepts a Rune and returns its length in bytes.
-int utf8_runelen(const utf8_rune r);
+// accepts a byte and returns the following rune's length.
+int utf8_runelen(const uint8_t byte);
 
 // utf8_runeslen
 // accepts a String and returns the length of
@@ -106,9 +101,5 @@ void utf8_pfree(utf8_parser *p);
 // on success codepoint will point contain a parsed rune,
 // on error a non-zero value will be returned.
 utf8_rune utf8_pget(utf8_parser *p);
-
-// utf8_pgets
-// returns string of as yet unparsed runes.
-const char *utf8_pgets(utf8_parser *p);
 
 #endif // CONN_UTF8_H_

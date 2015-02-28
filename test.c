@@ -70,7 +70,10 @@ bool test_encode_range() {
 	// just testing a few
 	int32_t test_arr[] = {INT32_MIN, -200, -1, INT32_MAX, 0x11ffff};
 	for (int32_t i = 0; i < (sizeof(test_arr) / sizeof(int32_t)); i++) {
+
 		utf8_rune r = func_encode(test_arr[i]);
+
+		// if ecode did not error correctly.
 		if (r != utf8_RUNE_INVALID) {
 			// incorrect!
 			if (r == utf8_RUNE_ERROR) {
@@ -87,11 +90,16 @@ bool test_encode_range() {
 bool test_encode_char(uint32_t code, char *ref) {
 	char str[sizeof(utf8_rune) + 1] = {0};
 	*((utf8_rune *) str) = func_encode(code);
+
+	// encode returned an invalid value.
 	if (!utf8_isvalid(*((utf8_rune *) str))) {
 		printf("returned error %#x, an invalid rune.\n", *((utf8_rune *) str));
 		return false;
 	}
+
+	// compare runes
 	if (strncmp((char *) str, ref, 4) != 0) {
+
 		// debug messages.
 		printf("U+%X->'%s' vs '%s'\n", code, ref, str);
 		printf("encode: "); print_bits_diff(*((int32_t *) str), *((int32_t *) ref)); putchar('\n');
