@@ -304,8 +304,6 @@ utf8_rune utf8_encode(const int32_t cp) {
 
 // checks byte for validity.
 bool utf8_isvalid(const utf8_rune rune) {
-	// TODO: implement validation tests.
-
 	// RFC 3629 mandates the the first byte indicate
 	// number of following bytes.
 	int len = utf8_runelen(rune);
