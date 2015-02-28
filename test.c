@@ -11,6 +11,8 @@
 // point to to alter the API.
 
 bool(*const func_isvalid)(const utf8_rune) = &utf8_isvalid;
+utf8_rune(*const func_encode)(const int32_t) = &utf8_encode;
+int32_t(*const func_decode)(const utf8_rune) = &utf8_decode;
 
 // Utility Functions
 
@@ -49,7 +51,7 @@ bool test_validation() {
 		char str[sizeof(utf8_rune) + 1] = {0};
 		utf8_rune *rune = ((utf8_rune *) str);
 		for (int32_t i = 0; i < 0x10ffff; i++) {
-			*rune = utf8_encode(i);
+			*rune = func_encode(i);
 			valid &= func_isvalid(*rune);
 			if (!valid) {
 				printf("'%s', U+%X-encode->%#x declared invalid.\n", (char *) str, i, *rune);
@@ -64,17 +66,13 @@ bool test_validation() {
 }
 
 bool test_encode_range() {
-	// out of range negative values
-	for (int32_t i = INT32_MIN; i < 0; i++) {
-		if (utf8_encode(i) != utf8_RUNE_ERROR) {
+	// out of range negative values,
+	// just testing a few
+	int32_t test_arr[] = {INT32_MIN, -200, -1, INT32_MAX, 0x11ffff};
+	for (int32_t i = 0; i < (sizeof(test_arr) / sizeof(int32_t)); i++) {
+		if (func_encode(test_arr[i]) != utf8_RUNE_ERROR) {
 			// incorrect!
-			return false;
-		}
-	}
-	// out of range positive numbers
-	for (int32_t i = INT32_MAX; i > 0x10ffff; i--) {
-		if (utf8_encode(i) != utf8_RUNE_ERROR) {
-			// incorrect!
+			printf("failed on %d (%#x)\n", test_arr[i], test_arr[i]);
 			return false;
 		}
 	}
@@ -83,7 +81,7 @@ bool test_encode_range() {
 
 bool test_encode_char(uint32_t code, char *ref) {
 	char str[sizeof(utf8_rune) + 1] = {0};
-	*((utf8_rune *) str) = utf8_encode(code);
+	*((utf8_rune *) str) = func_encode(code);
 	if (strncmp((char *) str, ref, 4) != 0) {
 		// debug messages.
 		printf("U+%X->'%s' vs '%s'\n", code, ref, str);
@@ -97,9 +95,9 @@ bool test_encode_char(uint32_t code, char *ref) {
 
 bool test_encode() {
 	// out of range
-	/*if (!test_encode_range()) {
+	if (!test_encode_range()) {
 		return false;
-	}*/
+	}
 	// enocde a few characters to test correctness.
 	if (!test_encode_char(0x7684, "\u7684")) {
 		return false;
@@ -130,7 +128,8 @@ bool test_parser() {
 
 		utf8_rune rune = utf8_encode(runes[i]);
 		if (r != rune) {
-			// debug messages.
+			// debug messages, only print 4 characters as runes
+			// are only 4 bytes.
 			printf("U+%X->'%.4s' vs '%.4s'\n", runes[i], (char *) &rune, (char *) &r);
 			printf("parser: "); print_bits_diff(r, rune); putchar('\n');
 			printf("ref:    "); print_bits_diff(rune, r); putchar('\n');

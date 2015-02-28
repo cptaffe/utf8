@@ -192,7 +192,7 @@ utf8_rune utf8_encode(const int32_t cp) {
 	// get number of bytes
 	int bl = 0;
 	// limits as indicated in RFC 3629.
-	if (cp < 0x80) {
+	if (cp >= 0 && cp < 0x80) {
 		bl = 1;
 	} else if (cp >= 0x80 && cp < 0x800) {
 		bl = 2;
@@ -397,11 +397,9 @@ utf8_rune utf8_pget(utf8_parser *parser) {
 	} else {
 		// multi-byte unicode value
 		// check for first two bits are 10
-		uint8_t mask = (1 << 6) + (1 << 7);
 		for (int i = 1; i < bl; i++) {
-			// TODO: testing!
-			if ((str[i] & mask) != (1 << 7)) {
-				return -1; // error
+			if ((str[i] & 0xc0) != 0x80) {
+				return utf8_RUNE_ERROR; // error
 			}
 		}
 		cp = utf8_readrune(str, bl);
