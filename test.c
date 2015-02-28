@@ -70,9 +70,14 @@ bool test_encode_range() {
 	// just testing a few
 	int32_t test_arr[] = {INT32_MIN, -200, -1, INT32_MAX, 0x11ffff};
 	for (int32_t i = 0; i < (sizeof(test_arr) / sizeof(int32_t)); i++) {
-		if (func_encode(test_arr[i]) != utf8_RUNE_ERROR) {
+		utf8_rune r = func_encode(test_arr[i]);
+		if (r != utf8_RUNE_INVALID) {
 			// incorrect!
-			printf("failed on %d (%#x)\n", test_arr[i], test_arr[i]);
+			if (r == utf8_RUNE_ERROR) {
+				printf("returned ERROR (%#x) on malformed rune, not INVALID (%#x).\n", utf8_RUNE_ERROR, utf8_RUNE_INVALID);
+			} else {
+				printf("encoded out of bounds: %d (%#x)\n", test_arr[i], test_arr[i]);
+			}
 			return false;
 		}
 	}
@@ -105,6 +110,52 @@ bool test_encode() {
 	if (!test_encode_char(0x7680, "\u7680")) {
 		return false;
 	}
+	return true;
+}
+
+// Tests decode in terms of encode.
+// Assumes encode will encode valid code-points correctly.
+// Practically, if something breaks here, it means one of encode
+// or decode is broken.
+bool test_decode_with_encode() {
+	// enocde/decode all possible characters.
+	// Assuming encode will encode valid code-points correctly.
+	for (int i = 0; i < 0x10ffff; i++) {
+		utf8_rune r = func_encode(i);
+		if (r == utf8_RUNE_ERROR) {
+			printf("encode returned an error on U+%X\n", i);
+			return false;
+		}
+		int32_t cp = func_decode(r);
+		if (cp < 0) {
+			printf("decode returned an error on '%.4s'\n", (char *) &r);
+			return false;
+		}
+		if (cp != i) {
+			// debug messages
+			printf("U+%X--encode-->'%.4s'--decode-->U+%X\n", i, (char *) &r, cp);
+			printf("decode: "); print_bits_diff(cp, i); putchar('\n');
+			printf("ref:    "); print_bits_diff(i, cp); putchar('\n');
+			printf("num:    "); print_bits(r); putchar('\n');
+			return false;
+		}
+	}
+
+	// Test for decoding invalid runes beginning with 10.
+	utf8_rune runes[] = {0b10111111};
+	for (int i = 0; i < (sizeof(runes) / sizeof(utf8_rune)); i++) {
+		utf8_rune r = func_decode(runes[i]);
+		if (r != utf8_RUNE_INVALID) {
+			if (r == utf8_RUNE_ERROR) {
+				printf("returned ERROR (%#x) on malformed rune, not INVALID (%#x).\n", utf8_RUNE_ERROR, utf8_RUNE_INVALID);
+			} else {
+				printf("returned %#x on invalid rune %#x\n", r, runes[i]);
+			}
+			return false;
+		}
+	}
+
+	// Testing decode on invalid rune values.
 	return true;
 }
 
@@ -148,6 +199,14 @@ int main() {
 	// utf8_encode testing
 	if (test_encode()) {
 		puts("encode success.");
+
+		// utf8_decode testing (dependent on utf8_encode)
+		if (test_decode_with_encode()) {
+			puts("decode success.");
+		} else {
+			puts("decode failure.");
+			ret = 1;
+		}
 
 		// utf8_valid testing (dependent on utf8_encode)
 		if (test_validation()) {

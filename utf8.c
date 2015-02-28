@@ -116,6 +116,9 @@ int utf8_runelen(const utf8_rune r) {
 		bytelength++;
 	}
 
+	if (bytelength == 1) {
+		return -1; // error, invalid rune header.
+	}
 	return bytelength;
 }
 
@@ -143,8 +146,8 @@ bool utf8_isstartbyte(const uint8_t rune) {
 // returns codepoint value of utf-8 character
 int32_t utf8_decode(const utf8_rune rune) {
 	// do not decode error runes
-	if (rune < 0) {
-		return utf8_RUNE_ERROR;
+	if (rune < 0 && !utf8_isvalid(rune)) {
+		return utf8_RUNE_INVALID;
 	}
 
 	int32_t cp = 0;
@@ -152,9 +155,9 @@ int32_t utf8_decode(const utf8_rune rune) {
 	int bl = utf8_runelen(rune);
 	if (bl < 0) {
 		// out of bounds
-		return utf8_RUNE_ERROR;
+		return utf8_RUNE_INVALID;
 	} else if (bl == 0) {
-		bl = 1;
+		return rune; // rune is code-point.
 	}
 
 	// forge mask
@@ -202,7 +205,7 @@ utf8_rune utf8_encode(const int32_t cp) {
 		bl = 4;
 	} else {
 		// not an encodeable character value
-		return utf8_RUNE_ERROR; // error
+		return utf8_RUNE_INVALID; // error
 	}
 
 	if (bl == 1) {
@@ -384,7 +387,7 @@ utf8_rune utf8_pget(utf8_parser *parser) {
 	const int bl = utf8_runelens(str);
 	if (bl < 0) {
 		// byte length out of bounds
-		return utf8_RUNE_ERROR;
+		return utf8_RUNE_INVALID;
 	}
 
 	if (bl == 0) {
@@ -399,7 +402,7 @@ utf8_rune utf8_pget(utf8_parser *parser) {
 		// check for first two bits are 10
 		for (int i = 1; i < bl; i++) {
 			if ((str[i] & 0xc0) != 0x80) {
-				return utf8_RUNE_ERROR; // error
+				return utf8_RUNE_INVALID; // error
 			}
 		}
 		cp = utf8_readrune(str, bl);
