@@ -6,7 +6,7 @@ OBJ := $(SRC:.c=.o)
 LIB = libutf8.o
 
 LIBS=
-CFLAGS+=-g  $(addprefix -I, $(dir $(LIBS)))
+CFLAGS+=-g --std=c89 $(addprefix -I, $(dir $(LIBS)))
 
 .PHONY: all clean test
 
@@ -26,6 +26,7 @@ clean:
 	$(foreach var,$(LIBS), $(MAKE) $(MAKEFLAGS) -C $(dir $(var)) clean;)
 
 # run tests
-test: $(TEST:.c=.o) $(LIB)
-	$(CC) $(CFLAGS) -o "test" $^
+test: $(LIB)
+	$(CC) $(CFLAGS) --std=c99 -o "test.o" -c "test.c"
+	$(CC) $(CFLAGS) -o "test" "test.o" $^
 	./test

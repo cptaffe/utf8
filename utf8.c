@@ -12,12 +12,15 @@ const size_t utf8_RUNE_MAXLEN = 4;
 
 // returns null on failure
 utf8_parser *utf8_pinit(const char *str) {
+	utf8_parser *p;
+
 	// assertions
 	if (!str) {
 		return NULL;
 	}
 
-	utf8_parser *p = calloc(sizeof(utf8_parser), 1);
+	// init p
+	p = calloc(sizeof(utf8_parser), 1);
 	p->str = str;
 	return p;
 }
@@ -27,14 +30,17 @@ void utf8_pfree(utf8_parser *parser) {
 }
 
 utf8_rune utf8_pget(utf8_parser *parser) {
+	const char *str;
+	utf8_rune rune;
+
 	// assertions
 	if (parser == NULL || parser->str ==  NULL) {
 		return utf8_RUNE_ERROR;
 	}
 
-	const char *str = &parser->str[parser->index];
+	str = &parser->str[parser->index];
 	// strlen excludes the null terminator, which we need to parse.
-	utf8_rune rune = utf8_getr(str, strlen(str) + 1);
+	rune = utf8_getr(str, strlen(str) + 1);
 	if (utf8_isvalid(rune)) {
 		parser->index += utf8_runelen(parser->str[parser->index]);
 	}
@@ -48,11 +54,11 @@ bool utf8_isstartbyte(const uint8_t rune) {
 }
 
 int utf8_runelen(const char byte) {
-	// build mask
 	uint8_t mask = 0;
-	int bytelength = 0;
+	int i, bytelength = 0;
 
-	for (int i = utf8_RUNE_MAXLEN - 1; i >= 0; i--) {
+
+	for (i = utf8_RUNE_MAXLEN - 1; i >= 0; i--) {
 		mask |= 1 << (i + (8 - utf8_RUNE_MAXLEN)); // eight is bits in a byte.
 		if ((byte & mask) != mask) {
 			// find maximum bits set before zero bit is found.
@@ -74,18 +80,21 @@ int utf8_runelen(const char byte) {
 
 // negative values are errors
 int utf8_strlen(const char *str) {
+	utf8_parser *parser;
+	int i;
+
 	// assertions
 	if (str == NULL) {
 		return -1; // error
 	}
 
 	// assert init was successful
-	utf8_parser *parser = utf8_pinit(str);
+	parser = utf8_pinit(str);
 	if (parser == NULL) {
 		return -1; // error
 	}
 
-	for (int i = 0;; i++) {
+	for (i = 0;; i++) {
 		utf8_rune rune = utf8_pget(parser);
 		if (rune == 0) {
 			utf8_pfree(parser);
@@ -99,25 +108,31 @@ int utf8_strlen(const char *str) {
 
 // reads rune from arbitrary memory
 utf8_rune utf8_getr(const void *mem, size_t size) {
-	// safety checks
-	if (!mem || !size) {
+	uint8_t *bytes;
+
+	// assertions
+	if (mem == NULL || size == 0) {
 		return utf8_RUNE_ERROR;
 	}
 
-	uint8_t *bytes = (uint8_t *) mem;
+	bytes = (uint8_t *) mem;
 
 	// check if first byte is a starting byte.
 	if (utf8_isstartbyte(bytes[0])) {
+		int len;
+
 		// decode rune
-		int len = utf8_runelen(bytes[0]);
+		len = utf8_runelen(bytes[0]);
 		if (len > 0) {
 			if (len <= size) {
+				int i;
+
 				// copy rune
 				utf8_rune rune = 0;
 				memcpy(&rune, mem, len);
 
 				// check for valid following characters
-				for (int i = 1; i < len; i++) {
+				for (i = 1; i < len; i++) {
 					// check first two bytes for 10xxxxxx
 					if ((((uint8_t *) &rune)[i] & 0xc0) != 0x80) {
 						return utf8_RUNE_INVALID;
@@ -139,80 +154,78 @@ utf8_rune utf8_getr(const void *mem, size_t size) {
 
 // returns codepoint value of utf-8 character
 int32_t utf8_decode(const utf8_rune rune) {
-	// do not decode error runes
+	int32_t codepoint = 0;
+	utf8_rune mask = 0;
+	int bytelen, i;
+
+	// assertions
 	if (!utf8_isvalid(rune)) {
 		return utf8_CP_INVALID;
 	}
 
-	int32_t cp = 0;
 	// get number of bits.
-	int bl = utf8_runelen(rune);
-	if (bl <= 0) {
+	bytelen = utf8_runelen(rune);
+	if (bytelen <= 0) {
 		// out of bounds
 		return utf8_CP_INVALID;
-	} else if (bl == 1) {
+	} else if (bytelen == 1) {
 		return rune; // rune is code-point.
 	}
 
 	// forge mask
-	utf8_rune mask = 0;
-	for (int i = 0; i < (7 - bl); i++) {
+	for (i = 0; i < (7 - bytelen); i++) {
 		mask += (1 << i);
 	}
 
-	cp = rune & mask;
-	// byte order is backwards on this machine (endianness).
 	// shift first bits by the the number of bits in each
-	// subsequent byte (6) once for every remaining byte (bl)
-	cp <<= (bl - 1) * 6;
+	// subsequent byte (6) once for every remaining byte
+	codepoint = (rune & mask) << (bytelen - 1) * 6;
 	mask = 0x3f;
-	for (int i = 1; i < bl; i++) {
-		// for each byte after the 1st, do:
-		uint32_t c = ((uint8_t *) &rune)[i] & mask;
-		// or with cp to combine bits,
-		// c is shifted by (bl - i) which means
-		// lower bits have higher values, multiply this
-		// by six (number of bits per byte), and that will
-		// give the shift needed to place lower bytes near
+	for (i = 1; i < bytelen; i++) {
+		// mask each byte after the first.
+		// shift by (bl - i) so lower bits have higher values,
+		// multiply this by six (number of bits per byte),
+		// which leaves the shift needed to place lower bytes near
 		// the first byte and provide the inverse ordering needed
 		// to get a correct number.
-		cp |= (c << (((bl - i) - 1) * 6));
+		codepoint |= ((((uint8_t *) &rune)[i] & mask)
+			<< (((bytelen - i) - 1) * 6));
 	}
 
-	return cp;
+	return codepoint;
 }
 
 // returns encoded rune from codepoint
-utf8_rune utf8_encode(const int32_t cp) {
-
+utf8_rune utf8_encode(const int32_t codepoint) {
 	utf8_rune rune = 0;
+	int bytelen = 0;
+
 	// get number of bytes
-	int bl = 0;
 	// limits as indicated in RFC 3629.
-	if (cp >= 0 && cp < 0x80) {
-		bl = 1;
-	} else if (cp >= 0x80 && cp < 0x800) {
-		bl = 2;
-	} else if (cp >= 0x800 && cp < 0xffff) {
-		bl = 3;
-	} else if (cp >= 0xffff && cp <= 0x10ffff) {
-		bl = 4;
+	if (codepoint >= 0 && codepoint < 0x80) {
+		bytelen = 1;
+	} else if (codepoint >= 0x80 && codepoint < 0x800) {
+		bytelen = 2;
+	} else if (codepoint >= 0x800 && codepoint < 0xffff) {
+		bytelen = 3;
+	} else if (codepoint >= 0xffff && codepoint <= 0x10ffff) {
+		bytelen = 4;
 	} else {
 		// not an encodeable character value
 		return utf8_RUNE_INVALID; // error
 	}
 
-	if (bl == 1) {
-		rune = (utf8_rune) cp; // no special transform
+	if (bytelen == 1) {
+		rune = (utf8_rune) codepoint; // no special transform
 	} else {
-		uint32_t mask = 0;
-		uint32_t code = 0;
+		uint32_t mask = 0, code = 0;
+		int i, offset;
 
 		/* generate the rune heading.
 			|              8-bits              |
 			<byte-length 1-bits><0-bit><payload>
 		*/
-		for (int i = 0; i < bl; i++) {
+		for (i = 0; i < bytelen; i++) {
 			code |= (1 << (7 - i));
 		}
 
@@ -224,11 +237,11 @@ utf8_rune utf8_encode(const int32_t cp) {
 			of the wanted byte, and then add 7, to get us to the
 			index of the last bit of that byte.
 		*/
-		for (int i = 0; i < bl; i++) {
+		for (i = 0; i < bytelen; i++) {
 			code |= (1 << ((8 * i) + 7));
 		}
 
-		int offset = bl - 1;
+		offset = bytelen - 1;
 
 		/* masks first byte
 			<length of encoding>0<code-point bits>
@@ -241,26 +254,26 @@ utf8_rune utf8_encode(const int32_t cp) {
 				     ^<----- (individual bit offset)
 			                <------------------------- (6-bit groups offset)
 		*/
-		for (int i = 0; i < (7 - bl); i++) {
+		for (i = 0; i < (7 - bytelen); i++) {
 			mask |= (1 << i) << (offset * 6);
 		}
 
 		// or mask, after being shifted back down.
-		code |= (mask & cp) >> (offset * 6);
+		code |= (mask & codepoint) >> (offset * 6);
 
 		// now we iterate over the next bytes and mask their bits.
-		for (int i = 1; i < bl; i++) {
+		for (i = 1; i < bytelen; i++) {
 			// 6 bit mask for each byte, 0x3f = 0b00111111.
 			// we shift the mask by the inverse of our counter
 			// (we order the last parts to the beginning), and
 			// subtract one because we only do this for bytes
 			// after the 1st. Then we multiply by six as six
 			// is the number of bits in a byte sans header.
-			code |= ((cp & (0x3f << (((bl - i) - 1) * 6)))
+			code |= ((codepoint & (0x3f << (((bytelen - i) - 1) * 6)))
 				// and reverse the shift, then shift back up i bytes.
-				>> (6 * ((bl - i) - 1))) << (8 * i);
-			rune = code;
+				>> (6 * ((bytelen - i) - 1))) << (8 * i);
 		}
+		rune = code;
 	}
 	return rune;
 }
