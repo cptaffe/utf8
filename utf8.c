@@ -146,8 +146,8 @@ bool utf8_isstartbyte(const uint8_t rune) {
 // returns codepoint value of utf-8 character
 int32_t utf8_decode(const utf8_rune rune) {
 	// do not decode error runes
-	if (rune < 0 && !utf8_isvalid(rune)) {
-		return utf8_RUNE_INVALID;
+	if (!utf8_isvalid(rune)) {
+		return utf8_CP_INVALID;
 	}
 
 	int32_t cp = 0;
@@ -155,7 +155,7 @@ int32_t utf8_decode(const utf8_rune rune) {
 	int bl = utf8_runelen(rune);
 	if (bl < 0) {
 		// out of bounds
-		return utf8_RUNE_INVALID;
+		return utf8_CP_INVALID;
 	} else if (bl == 0) {
 		return rune; // rune is code-point.
 	}

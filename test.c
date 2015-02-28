@@ -87,6 +87,10 @@ bool test_encode_range() {
 bool test_encode_char(uint32_t code, char *ref) {
 	char str[sizeof(utf8_rune) + 1] = {0};
 	*((utf8_rune *) str) = func_encode(code);
+	if (!utf8_isvalid(*((utf8_rune *) str))) {
+		printf("returned error %#x, an invalid rune.\n", *((utf8_rune *) str));
+		return false;
+	}
 	if (strncmp((char *) str, ref, 4) != 0) {
 		// debug messages.
 		printf("U+%X->'%s' vs '%s'\n", code, ref, str);
@@ -122,6 +126,11 @@ bool test_decode_with_encode() {
 	// Assuming encode will encode valid code-points correctly.
 	for (int i = 0; i < 0x10ffff; i++) {
 		utf8_rune r = func_encode(i);
+		if (!utf8_isvalid(r)) {
+			// check for validity.
+			printf("returned error %#x, an invalid rune.\n", r);
+			return false;
+		}
 		if (r == utf8_RUNE_ERROR) {
 			printf("encode returned an error on U+%X\n", i);
 			return false;
@@ -145,9 +154,9 @@ bool test_decode_with_encode() {
 	utf8_rune runes[] = {0b10111111};
 	for (int i = 0; i < (sizeof(runes) / sizeof(utf8_rune)); i++) {
 		utf8_rune r = func_decode(runes[i]);
-		if (r != utf8_RUNE_INVALID) {
-			if (r == utf8_RUNE_ERROR) {
-				printf("returned ERROR (%#x) on malformed rune, not INVALID (%#x).\n", utf8_RUNE_ERROR, utf8_RUNE_INVALID);
+		if (r != utf8_CP_INVALID) {
+			if (r == utf8_CP_ERROR) {
+				printf("returned ERROR (%#x) on malformed rune, not INVALID (%#x).\n", utf8_CP_ERROR, utf8_CP_INVALID);
 			} else {
 				printf("returned %#x on invalid rune %#x\n", r, runes[i]);
 			}

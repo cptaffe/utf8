@@ -31,8 +31,14 @@ typedef int32_t utf8_rune;
 
 // rune value defines
 enum {
-	utf8_RUNE_ERROR = INT32_MIN,
-	utf8_RUNE_INVALID,
+	utf8_CP_ERROR = INT32_MIN,
+	utf8_CP_INVALID,
+};
+
+enum {
+	// 0xc0 and 0xc1 are guaranteed not to appear.
+	utf8_RUNE_ERROR = 0xc0,
+	utf8_RUNE_INVALID
 };
 
 // utf8_runelen
