@@ -210,6 +210,20 @@ bool test_parser() {
 	return true;
 }
 
+bool test_strlen() {
+	char *str = "\u7684\u7680";
+	int len = utf8_strlen(str);
+	if (len == 2) {
+		return true;
+	} else if (len < 0) {
+		puts("strlen returned an error.");
+		return false;
+	} else {
+		printf("incorrect length %d\n", len);
+		return false;
+	}
+}
+
 int main() {
 	int ret = 0;
 
@@ -238,6 +252,14 @@ int main() {
 			puts("parser success.");
 		} else {
 			puts("parser failure.");
+			ret = 1;
+		}
+
+		// utf8_valid testing (dependent on utf8_encode)
+		if (test_strlen()) {
+			puts("strlen success.");
+		} else {
+			puts("strlen failure.");
 			ret = 1;
 		}
 	} else {

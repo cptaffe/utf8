@@ -10,11 +10,6 @@
 const int32_t utf8_CODEPOINT_MAX = 0x10ffff;
 const size_t utf8_RUNE_MAXLEN = 4;
 
-// allocate zeroed memory
-static inline void *alloc(size_t size) {
-	return calloc(size, 1);
-}
-
 // returns null on failure
 utf8_parser *utf8_pinit(const char *str) {
 	// assertions
@@ -22,7 +17,7 @@ utf8_parser *utf8_pinit(const char *str) {
 		return NULL;
 	}
 
-	utf8_parser *p = alloc(sizeof(utf8_parser));
+	utf8_parser *p = calloc(sizeof(utf8_parser), 1);
 	p->str = str;
 	return p;
 }
@@ -33,7 +28,7 @@ void utf8_pfree(utf8_parser *parser) {
 
 utf8_rune utf8_pget(utf8_parser *parser) {
 	// assertions
-	if (!parser || !parser->str) {
+	if (parser == NULL || parser->str ==  NULL) {
 		return utf8_RUNE_ERROR;
 	}
 
@@ -69,7 +64,7 @@ int utf8_runelen(const char byte) {
 	if (bytelength == 1) {
 		// 10xxxxxx is reserved for non-startbytes.
 		return -1;
-	} else if (!bytelength) {
+	} else if (bytelength == 0) {
 		// encoding specifies 0xxxxxxx means 1 byte.
 		bytelength++;
 	}
@@ -80,20 +75,26 @@ int utf8_runelen(const char byte) {
 // negative values are errors
 int utf8_strlen(const char *str) {
 	// assertions
-	if (!str) {
+	if (str == NULL) {
 		return -1; // error
 	}
 
 	// assert init was successful
 	utf8_parser *parser = utf8_pinit(str);
-	if (!parser) {
-		return -1;
+	if (parser == NULL) {
+		return -1; // error
 	}
 
-	uint32_t i;
-	for (i = 0; utf8_pget(parser) >= 0; i++);
-	utf8_pfree(parser);
-	return i;
+	for (int i = 0;; i++) {
+		utf8_rune rune = utf8_pget(parser);
+		if (rune == 0) {
+			utf8_pfree(parser);
+			return i; // null terminator
+		} else if (!utf8_isvalid(rune)) {
+			utf8_pfree(parser);
+			return -1; // error
+		}
+	}
 }
 
 // reads rune from arbitrary memory
@@ -117,8 +118,8 @@ utf8_rune utf8_getr(const void *mem, size_t size) {
 
 				// check for valid following characters
 				for (int i = 1; i < len; i++) {
+					// check first two bytes for 10xxxxxx
 					if ((((uint8_t *) &rune)[i] & 0xc0) != 0x80) {
-						// puts("subsequent byte lacks 10 heading.");
 						return utf8_RUNE_INVALID;
 					}
 				}
