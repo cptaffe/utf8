@@ -67,8 +67,10 @@ int utf8_runelen(const char byte) {
 	}
 
 	if (bytelength == 1) {
-		return -1; // error, invalid rune header.
+		// 10xxxxxx is reserved for non-startbytes.
+		return -1;
 	} else if (!bytelength) {
+		// encoding specifies 0xxxxxxx means 1 byte.
 		bytelength++;
 	}
 
