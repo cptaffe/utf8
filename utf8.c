@@ -10,49 +10,6 @@
 const int32_t utf8_CODEPOINT_MAX = 0x10ffff;
 const size_t utf8_RUNE_MAXLEN = 4;
 
-// utf-8 byte order mark (bom).
-const char UTF8_BOM[] = {0xef, 0xbb, 0xbf, 0x0};
-
-// reads rune from arbitrary memory
-utf8_rune utf8_getr(const void *mem, size_t size) {
-	// safety checks
-	if (!mem || !size) {
-		return utf8_RUNE_ERROR;
-	}
-
-	uint8_t *bytes = (uint8_t *) mem;
-
-	// check if first byte is a starting byte.
-	if (utf8_isstartbyte(bytes[0])) {
-		// decode rune
-		int len = utf8_runelen(bytes[0]);
-		if (len > 0) {
-			if (len <= size) {
-				// copy rune
-				utf8_rune rune = 0;
-				memcpy(&rune, mem, len);
-
-				// check for valid following characters
-				for (int i = 1; i < len; i++) {
-					if ((((uint8_t *) &rune)[i] & 0xc0) != 0x80) {
-						// puts("subsequent byte lacks 10 heading.");
-						return utf8_RUNE_INVALID;
-					}
-				}
-
-				// have good rune.
-				return rune;
-			} else {
-				return utf8_RUNE_SHORT;
-			}
-		} else {
-			return utf8_RUNE_INVALID;
-		}
-	} else {
-		return utf8_RUNE_INVALID;
-	}
-}
-
 // allocate zeroed memory
 static inline void *alloc(size_t size) {
 	return calloc(size, 1);
@@ -95,7 +52,7 @@ bool utf8_isstartbyte(const uint8_t rune) {
 	return ((rune & 0xc0) == 0xc0 || (rune & 0x80) == 0);
 }
 
-int utf8_runelen(const uint8_t byte) {
+int utf8_runelen(const char byte) {
 	// build mask
 	uint8_t mask = 0;
 	int bytelength = 0;
@@ -118,42 +75,6 @@ int utf8_runelen(const uint8_t byte) {
 	return bytelength;
 }
 
-// returns the length of the current token.
-int utf8_runelens(const char *str) {
-	// assertions
-	if (!str) {
-		return -1;
-	}
-
-	return utf8_runelen(str[0]);
-}
-
-// compare two strings (not length dependent)
-int utf8_strcmp(const char *a, const char *b) {
-	// assertions
-	assert(a && b);
-
-	size_t alen, blen, len;
-	if ((alen = strlen(a)) >= (blen = strlen(b))) {
-		len = alen;
-	} else {
-		len = blen;
-	}
-
-	return strncmp(a, b, len);
-}
-
-// checks for bom, if found, increments over it.
-bool utf8_strchkbom(const char *str) {
-	// length safety
-	if (strlen(str) >= sizeof(UTF8_BOM)) {
-		if (utf8_strcmp(str, UTF8_BOM)) {
-			return true;
-		}
-	}
-	return false;
-}
-
 // negative values are errors
 int utf8_strlen(const char *str) {
 	// assertions
@@ -171,6 +92,46 @@ int utf8_strlen(const char *str) {
 	for (i = 0; utf8_pget(parser) >= 0; i++);
 	utf8_pfree(parser);
 	return i;
+}
+
+// reads rune from arbitrary memory
+utf8_rune utf8_getr(const void *mem, size_t size) {
+	// safety checks
+	if (!mem || !size) {
+		return utf8_RUNE_ERROR;
+	}
+
+	uint8_t *bytes = (uint8_t *) mem;
+
+	// check if first byte is a starting byte.
+	if (utf8_isstartbyte(bytes[0])) {
+		// decode rune
+		int len = utf8_runelen(bytes[0]);
+		if (len > 0) {
+			if (len <= size) {
+				// copy rune
+				utf8_rune rune = 0;
+				memcpy(&rune, mem, len);
+
+				// check for valid following characters
+				for (int i = 1; i < len; i++) {
+					if ((((uint8_t *) &rune)[i] & 0xc0) != 0x80) {
+						// puts("subsequent byte lacks 10 heading.");
+						return utf8_RUNE_INVALID;
+					}
+				}
+
+				// have good rune.
+				return rune;
+			} else {
+				return utf8_RUNE_SHORT;
+			}
+		} else {
+			return utf8_RUNE_INVALID;
+		}
+	} else {
+		return utf8_RUNE_INVALID;
+	}
 }
 
 // returns codepoint value of utf-8 character

@@ -18,10 +18,6 @@ extern const size_t utf8_RUNE_MAXLEN;
 // negative values are considered errors.
 typedef int32_t utf8_rune;
 
-// utf8_getr
-// returns a rune from some memory, of max length size.
-utf8_rune utf8_getr(const void *mem, size_t size);
-
 // rune value defines
 enum {
 	utf8_CP_ERROR = INT32_MIN,
@@ -36,14 +32,13 @@ enum {
 	utf8_RUNE_SHORT = 0xf5,
 };
 
+// utf8_getr
+// returns a rune from some memory, of max length size.
+utf8_rune utf8_getr(const void *mem, size_t size);
+
 // utf8_runelen
 // accepts a byte and returns the following rune's length.
-int utf8_runelen(const uint8_t byte);
-
-// utf8_runeslen
-// accepts a String and returns the length of
-// the first Rune in bytes.
-int utf8_runelens(const char *str);
+int utf8_runelen(const char byte);
 
 // utf8_isvalid
 // accepts a Rune and returns whether it is
@@ -70,11 +65,6 @@ int32_t utf8_decode(const utf8_rune rune);
 // utf8_strlen
 // returns the number of Runes in a String.
 int utf8_strlen(const char *str);
-
-// utf8_strchkbom
-// accepts a String and checks for a
-// byte-order-mark at the beginning of the string.
-bool utf8_strchkbom(const char *str);
 
 
 // Parser
