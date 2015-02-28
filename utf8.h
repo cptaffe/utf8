@@ -39,10 +39,20 @@ enum {
 // accepts a Rune and returns its length in bytes.
 int utf8_runelen(const utf8_rune r);
 
+// utf8_runeslen
+// accepts a String and returns the length of
+// the first Rune in bytes.
+int utf8_runelens(const char *str);
+
 // utf8_isvalid
 // accepts a Rune and returns whether it is
 // a valid character as a bool.
 bool utf8_isvalid(const utf8_rune cp);
+
+// utf8_isstartbyte
+// accepts a uint8_t and returns whether it is
+// a start rune as a bool.
+bool utf8_isstartbyte(const uint8_t rune);
 
 // utf8_encode
 // accepts a 4-byte codepoint and a pointer to a Rune.
@@ -59,11 +69,6 @@ int32_t utf8_decode(const utf8_rune rune);
 // utf8_strlen
 // returns the number of Runes in a String.
 int utf8_strlen(const char *str);
-
-// utf8_runeslen
-// accepts a String and returns the length of
-// the first Rune in bytes.
-int utf8_runeslen(const char *str);
 
 // utf8_strchkbom
 // accepts a String and checks for a

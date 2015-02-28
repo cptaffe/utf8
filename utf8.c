@@ -58,23 +58,6 @@ int utf8_funget(FILE *file, const utf8_rune r) {
 	return 0;
 }
 
-// returns null on failure
-utf8_parser *utf8_pinit(const char *str) {
-	// assertions
-	if (!str) {
-		return NULL;
-	}
-
-	utf8_parser *p = malloc(sizeof(utf8_parser));
-	memset(p, 0, sizeof(utf8_parser));
-	p->str = str;
-	return p;
-}
-
-void utf8_pfree(utf8_parser *parser) {
-	free(parser);
-}
-
 // compare two strings (not length dependent)
 int utf8_strcmp(const char *a, const char *b) {
 	// assertions
@@ -145,6 +128,16 @@ bool utf8_strchkbom(const char *str) {
 		}
 	}
 	return false;
+}
+
+// used for finding start rune
+bool utf8_isstartbyte(const uint8_t rune) {
+	// first bit is 0 or first two bits are 11.
+	if ((rune & 0xc0) == 0xc0 || (rune & 0x80) == 0) {
+		return true;
+	} else {
+		return false;
+	}
 }
 
 // returns codepoint value of utf-8 character
@@ -341,6 +334,27 @@ utf8_rune utf8_readrune(const char *str, size_t len) {
 	return cp;
 }
 
+// allocate zeroed memory
+static inline void *alloc(size_t size) {
+	return calloc(size, 1);
+}
+
+// returns null on failure
+utf8_parser *utf8_pinit(const char *str) {
+	// assertions
+	if (!str) {
+		return NULL;
+	}
+
+	utf8_parser *p = alloc(sizeof(utf8_parser));
+	p->str = str;
+	return p;
+}
+
+void utf8_pfree(utf8_parser *parser) {
+	free(parser);
+}
+
 const char *utf8_pgets(utf8_parser *parser) {
 	// assertions
 	if (!parser || !parser->str) {
@@ -367,7 +381,7 @@ utf8_rune utf8_pget(utf8_parser *parser) {
 	}
 
 	// get byte length of token.
-	const int bl = utf8_strlen(str);
+	const int bl = utf8_runelens(str);
 	if (bl < 0) {
 		// byte length out of bounds
 		return utf8_RUNE_ERROR;
@@ -375,12 +389,8 @@ utf8_rune utf8_pget(utf8_parser *parser) {
 
 	if (bl == 0) {
 		// standard ascii value
-		if (str[0] == 0) {
-			return 1; // eof, error
-		} else {
-			cp = utf8_readrune(str, 1);
-			parser->index++;
-		}
+		cp = utf8_readrune(str, 1);
+		parser->index++;
 	} else if (bl == 1) {
 		// unsupported character
 		return utf8_RUNE_INVALID;
