@@ -42,7 +42,8 @@ utf8_rune utf8_pget(utf8_parser *parser) {
 	// strlen excludes the null terminator, which we need to parse.
 	rune = utf8_getr(str, strlen(str) + 1);
 	if (utf8_isvalid(rune)) {
-		parser->index += utf8_runelen(parser->str[parser->index]);
+		size_t len = utf8_runelen(parser->str[parser->index]);
+		parser->index += len;
 	}
 	return rune; // propogate error, if exists
 }
@@ -69,7 +70,7 @@ int utf8_runelen(const char byte) {
 
 	if (bytelength == 1) {
 		// 10xxxxxx is reserved for non-startbytes.
-		return -1;
+		return utf8_CP_INVALID;
 	} else if (bytelength == 0) {
 		// encoding specifies 0xxxxxxx means 1 byte.
 		bytelength++;
@@ -85,13 +86,13 @@ int utf8_strlen(const char *str) {
 
 	// assertions
 	if (str == NULL) {
-		return -1; // error
+		return utf8_CP_ERROR; // error
 	}
 
 	// assert init was successful
 	parser = utf8_pinit(str);
 	if (parser == NULL) {
-		return -1; // error
+		return utf8_CP_ERROR; // error
 	}
 
 	for (i = 0;; i++) {
@@ -101,7 +102,7 @@ int utf8_strlen(const char *str) {
 			return i; // null terminator
 		} else if (!utf8_isvalid(rune)) {
 			utf8_pfree(parser);
-			return -1; // error
+			return utf8_CP_INVALID; // error
 		}
 	}
 }
