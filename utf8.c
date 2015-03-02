@@ -42,8 +42,7 @@ utf8_rune utf8_pget(utf8_parser *parser) {
 	// strlen excludes the null terminator, which we need to parse.
 	rune = utf8_getr(str, strlen(str) + 1);
 	if (utf8_isvalid(rune)) {
-		size_t len = utf8_runelen(parser->str[parser->index]);
-		parser->index += len;
+		parser->index += utf8_runelen(*str);
 	}
 	return rune; // propogate error, if exists
 }
