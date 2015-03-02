@@ -11,7 +11,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif // __C_PLUS_PLUS__
+#endif // __cplusplus
 
 extern const int utf8_CODEPOINT_MAX;
 extern const size_t utf8_RUNE_MAXLEN;
@@ -100,4 +100,4 @@ utf8_rune utf8_pget(utf8_parser *p);
 
 #ifdef __cplusplus
 } // extern "C"
-#endif // __CPLUS_PLUS__
+#endif // __cplusplus
