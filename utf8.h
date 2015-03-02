@@ -4,14 +4,15 @@
 #ifndef CONN_UTF8_H_
 #define CONN_UTF8_H_
 
+// C++ compatibility
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif // __cplusplus
 
 extern const int utf8_CODEPOINT_MAX;
 extern const size_t utf8_RUNE_MAXLEN;
@@ -96,8 +97,9 @@ void utf8_pfree(utf8_parser *p);
 // on error a non-zero value will be returned.
 utf8_rune utf8_pget(utf8_parser *p);
 
-#endif // CONN_UTF8_H_
-
+// C++ compatibility
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus
+
+#endif // CONN_UTF8_H_
