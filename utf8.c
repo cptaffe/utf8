@@ -109,6 +109,11 @@ int utf8_strlen(const char *str) {
 // reads rune from arbitrary memory
 utf8_rune utf8_getr(const void *mem, size_t size) {
 	uint8_t *bytes;
+	enum {
+		// check first two bits for 10xxxxxx
+		BITMASKTOP = 0xc0, // mask first two bits
+		BITSSETTOP = 0x80, // first bit set
+	};
 
 	// assertions
 	if (mem == NULL || size == 0) {
@@ -118,37 +123,34 @@ utf8_rune utf8_getr(const void *mem, size_t size) {
 	bytes = (uint8_t *) mem;
 
 	// check if first byte is a starting byte.
-	if (utf8_isstartbyte(bytes[0])) {
+	if (!utf8_isstartbyte(bytes[0])) {
+		return utf8_RUNE_INVALID;
+	} else {
 		int len;
 
 		// decode rune
 		len = utf8_runelen(bytes[0]);
-		if (len > 0) {
-			if (len <= size) {
-				int i;
-
-				// copy rune
-				utf8_rune rune = 0;
-				memcpy(&rune, mem, len);
-
-				// check for valid following characters
-				for (i = 1; i < len; i++) {
-					// check first two bytes for 10xxxxxx
-					if ((((uint8_t *) &rune)[i] & 0xc0) != 0x80) {
-						return utf8_RUNE_INVALID;
-					}
-				}
-
-				// have good rune.
-				return rune;
-			} else {
-				return utf8_RUNE_SHORT;
-			}
-		} else {
+		if (len <= 0) {
 			return utf8_RUNE_INVALID;
+		} else if (len <= size) {
+			int i;
+
+			// copy rune
+			utf8_rune rune = 0;
+			memcpy(&rune, mem, len);
+
+			// check for valid following characters
+			for (i = 1; i < len; i++) {
+				if ((((uint8_t *) &rune)[i] & BITMASKTOP) != BITSSETTOP) {
+					return utf8_RUNE_INVALID;
+				}
+			}
+
+			// have good rune.
+			return rune;
+		} else {
+			return utf8_RUNE_SHORT;
 		}
-	} else {
-		return utf8_RUNE_INVALID;
 	}
 }
 
@@ -157,6 +159,9 @@ int32_t utf8_decode(const utf8_rune rune) {
 	int32_t codepoint = 0;
 	utf8_rune mask = 0;
 	int bytelen, i;
+	enum {
+		BITMASKBOTTOM = 0x3f, // mask lower 6 bits
+	};
 
 	// assertions
 	if (!utf8_isvalid(rune)) {
@@ -173,14 +178,15 @@ int32_t utf8_decode(const utf8_rune rune) {
 	}
 
 	// forge mask
-	for (i = 0; i < (7 - bytelen); i++) {
+	for (i = 0; i < ((8 - 1) - bytelen); i++) {
 		mask += (1 << i);
 	}
 
 	// shift first bits by the the number of bits in each
 	// subsequent byte (6) once for every remaining byte
 	codepoint = (rune & mask) << (bytelen - 1) * 6;
-	mask = 0x3f;
+
+
 	for (i = 1; i < bytelen; i++) {
 		// mask each byte after the first.
 		// shift by (bl - i) so lower bits have higher values,
@@ -188,7 +194,7 @@ int32_t utf8_decode(const utf8_rune rune) {
 		// which leaves the shift needed to place lower bytes near
 		// the first byte and provide the inverse ordering needed
 		// to get a correct number.
-		codepoint |= ((((uint8_t *) &rune)[i] & mask)
+		codepoint |= ((((uint8_t *) &rune)[i] & BITMASKBOTTOM)
 			<< (((bytelen - i) - 1) * 6));
 	}
 
@@ -199,16 +205,23 @@ int32_t utf8_decode(const utf8_rune rune) {
 utf8_rune utf8_encode(const int32_t codepoint) {
 	utf8_rune rune = 0;
 	int bytelen = 0;
+	enum {
+		ONEBYTELOWER = 0,
+		ONEBYTEUPPER = 0x80,
+		TWOBYTEUPPER = 0x800,
+		THREEBYTEUPPER = 0xffff,
+		FOURBYTEUPPER = 0x10ffff,
+	};
 
 	// get number of bytes
 	// limits as indicated in RFC 3629.
-	if (codepoint >= 0 && codepoint < 0x80) {
+	if (codepoint >= ONEBYTELOWER && codepoint < ONEBYTEUPPER) {
 		bytelen = 1;
-	} else if (codepoint >= 0x80 && codepoint < 0x800) {
+	} else if (codepoint >= ONEBYTEUPPER && codepoint < TWOBYTEUPPER) {
 		bytelen = 2;
-	} else if (codepoint >= 0x800 && codepoint < 0xffff) {
+	} else if (codepoint >= TWOBYTEUPPER && codepoint < THREEBYTEUPPER) {
 		bytelen = 3;
-	} else if (codepoint >= 0xffff && codepoint <= 0x10ffff) {
+	} else if (codepoint >= THREEBYTEUPPER && codepoint <= FOURBYTEUPPER) {
 		bytelen = 4;
 	} else {
 		// not an encodeable character value
@@ -284,6 +297,7 @@ bool utf8_isvalid(const utf8_rune rune) {
 	// RFC 3629 mandates the the first byte indicate
 	// number of following bytes.
 	int len = utf8_runelen(rune);
+
 	if (len <= 0) {
 		return false;
 	} else {
