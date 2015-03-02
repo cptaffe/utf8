@@ -9,7 +9,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
-#ifdef __C_PLUS_PLUS__
+#ifdef __cplusplus
 extern "C" {
 #endif // __C_PLUS_PLUS__
 
@@ -98,6 +98,6 @@ utf8_rune utf8_pget(utf8_parser *p);
 
 #endif // CONN_UTF8_H_
 
-#ifdef __C_PLUS_PLUS__
+#ifdef __cplusplus
 } // extern "C"
 #endif // __CPLUS_PLUS__
