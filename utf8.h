@@ -9,6 +9,10 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#ifdef __C_PLUS_PLUS__
+extern "C" {
+#endif // __C_PLUS_PLUS__
+
 extern const int utf8_CODEPOINT_MAX;
 extern const size_t utf8_RUNE_MAXLEN;
 
@@ -93,3 +97,7 @@ void utf8_pfree(utf8_parser *p);
 utf8_rune utf8_pget(utf8_parser *p);
 
 #endif // CONN_UTF8_H_
+
+#ifdef __C_PLUS_PLUS__
+} // extern "C"
+#endif // __CPLUS_PLUS__
