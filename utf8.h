@@ -30,11 +30,10 @@ enum {
 };
 
 enum {
-	// 0xc0 and 0xc1 are guaranteed not to appear.
-	utf8_RUNE_ERROR = 0xc0,
-	utf8_RUNE_INVALID,
 	// 0xf5-0xff are guaranteed to not be valid.
-	utf8_RUNE_SHORT = 0xf5,
+	utf8_RUNE_ERROR = 0xf5,
+	utf8_RUNE_INVALID,
+	utf8_RUNE_SHORT,
 };
 
 // utf8_getr
